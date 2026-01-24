@@ -90,6 +90,13 @@ mvn test
 - `src/test/java/`: Unit tests.
 - `pom.xml`: Maven configuration.
 
+## Author
+
+Abdelali Boussadi
+
+- Email: boussadiabdelali@yahoo.fr
+- LinkedIn: https://www.linkedin.com/in/abdelali-boussadi-ph-d-04307713/ 
+
 ## License
 
 This project is licensed under the MIT License.
