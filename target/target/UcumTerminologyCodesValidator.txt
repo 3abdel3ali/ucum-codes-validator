@@ -1,0 +1,2 @@
+12:07:58.807 [main] INFO  com.abdelaliboussadi.terminology.UcumTerminologyCodesValidator - Starting UCUM Terminology Codes Validation execution.
+12:07:58.808 [main] ERROR com.abdelaliboussadi.terminology.PropertiesUtil - Configuration file not found at: configuration.properties. This file is required to run the application.
