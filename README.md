@@ -170,7 +170,13 @@ Abdelali Boussadi
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the **Apache License 2.0** with an **additional attribution clause**. 
+
+Any use of this code must provide explicit attribution to:
+- The original author: Abdelali Boussadi, PhD
+- The original repository: https://github.com/3abdel3ali/ucum_client
+
+See the [LICENSE](LICENSE) file for full details.
 
 ## Contributing
 
