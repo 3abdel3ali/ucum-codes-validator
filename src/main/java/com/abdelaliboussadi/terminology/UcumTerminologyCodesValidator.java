@@ -3,6 +3,7 @@ package com.abdelaliboussadi.terminology;
 import org.fhir.ucum.UcumEssenceService;
 import org.fhir.ucum.UcumService;
 import org.fhir.ucum.UcumException;
+import org.fhir.ucum.Decimal;
 
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -20,27 +21,75 @@ public class UcumTerminologyCodesValidator
 
 /**
      * main : arguments :
+     * Validation mode:
      *   args[0] = chemin vers ucum-essence.xml
      *   args[1] = code UCUM à vérifier (ex : "mg", "kg/m2", "mm[Hg]", "/min")
+     * Conversion mode:
+     *   args[0] = chemin vers ucum-essence.xml
+     *   args[1] = value to convert (e.g., "10")
+     *   args[2] = source unit (e.g., "kg")
+     *   args[3] = destination unit (e.g., "[lb_av]")
      */
     public static void main(String[] args) {
         logger.info("Starting UCUM Terminology Codes Validation execution.");
-        if (args.length == 0) {
-        args = new String[]{
-                PropertiesUtil.getProperties("ucum.essence.path"),
-                PropertiesUtil.getProperties("ucum.default.code")
-        };
-    }
-        if (args.length != 2) {
-            logger.error("Usage: java -cp <jar:deps> " +
-                    "com.example.ucumvalidator.UcumCodeChecker <path-to-ucum-essence.xml> <ucumCode>");
+        boolean codeValidation = Boolean.parseBoolean(PropertiesUtil.getProperties("codeValidation"));
+        boolean codeConversion = Boolean.parseBoolean(PropertiesUtil.getProperties("codeConversion"));
+
+        String ucumDefinitionPath = null;
+        String candidateCode = null;
+        String conversionValue = null;
+        String sourceUnit = null;
+        String destinationUnit = null;
+
+        if (codeConversion && args.length != 0 && args.length != 4 && args.length != 2) {
+            logger.error("Usage for conversion: java -cp <jar:deps> " +
+                "com.example.ucumvalidator.UcumCodeChecker <path-to-ucum-essence.xml> <value> <sourceUnit> <destUnit>");
             logger.info("Execution ended with an exception.");
             logger.info("");
             System.exit(1);
         }
 
-        String ucumDefinitionPath = args[0];
-        String candidateCode = args[1];
+        if (codeValidation && args.length == 0) {
+            ucumDefinitionPath = PropertiesUtil.getProperties("ucum.essence.path");
+            candidateCode = PropertiesUtil.getProperties("ucum.default.code");
+        } else if (codeValidation && args.length == 2) {
+            ucumDefinitionPath = args[0];
+            candidateCode = args[1];
+        }
+
+        if (codeConversion) {
+            if (args.length == 4) {
+                ucumDefinitionPath = args[0];
+                conversionValue = args[1];
+                sourceUnit = args[2];
+                destinationUnit = args[3];
+            } else {
+                if (ucumDefinitionPath == null) {
+                    ucumDefinitionPath = PropertiesUtil.getProperties("ucum.essence.path");
+                }
+                conversionValue = PropertiesUtil.getProperties("conversion.value");
+                sourceUnit = PropertiesUtil.getProperties("conversion.source.unit");
+                destinationUnit = PropertiesUtil.getProperties("conversion.destination.unit");
+            }
+
+            if (codeValidation && candidateCode == null) {
+                candidateCode = PropertiesUtil.getProperties("ucum.default.code");
+            }
+        }
+
+        if (!codeValidation && !codeConversion) {
+            logger.error("Both codeValidation and codeConversion are false. Enable at least one feature.");
+            logger.info("Execution ended with an exception.");
+            logger.info("");
+            System.exit(1);
+        }
+
+        if (ucumDefinitionPath == null || ucumDefinitionPath.trim().isEmpty()) {
+            logger.error("UCUM definition path is missing.");
+            logger.info("Execution ended with an exception.");
+            logger.info("");
+            System.exit(1);
+        }
 
         // Vérification basique du fichier de définition
         try {
@@ -59,10 +108,6 @@ public class UcumTerminologyCodesValidator
         }
 
         try {
-            if (ucumDefinitionPath == null || ucumDefinitionPath.trim().isEmpty() || candidateCode == null || candidateCode.trim().isEmpty()) {
-                throw new IllegalArgumentException("the argument is missing");
-            }
-
             UcumService ucumSvc = null;
             // Instancie le service UCUM en chargeant le fichier d'essence UCUM.
             // Le constructeur prend ici le chemin (String) vers le fichier.
@@ -70,24 +115,14 @@ public class UcumTerminologyCodesValidator
             ucumSvc = new UcumEssenceService(ucumDefinitionPath);
 
             logger.info("Chargement de la définition UCUM réussi.");
-            logger.info("Analyse du code UCUM : \"" + candidateCode + "\" ...");
+            if (codeValidation) {
+                validateCode(ucumSvc, candidateCode);
+            }
 
-            /*
-             * La méthode analyse(...) tente de parser / analyser l'unité.
-             * - Si l'analyse réussit, on considère que l'unité est connue / valide.
-             * - Si l'unité est inconnue / mal formée, la bibliothèque lance UcumException.
-             *
-             * Le type de retour exact (String/objet) peut contenir des détails ; ici
-             * on affiche le résultat texte si l'analyse renvoie quelque chose d'utile.
-             */
+            if (codeConversion) {
+                convertValue(ucumSvc, conversionValue, sourceUnit, destinationUnit);
+            }
 
-            
-            
-            
-            String analysisResult = ucumSvc.analyse(candidateCode);
-            // Si on arrive ici, l'analyse s'est déroulée sans exception -> unité valide
-            logger.info("Le code UCUM est VALIDE.");
-            logger.info("Résultat d'analyse (brut) : " + analysisResult);
             logger.info("Execution completed successfully.");
             logger.info("");
 
@@ -113,6 +148,26 @@ public class UcumTerminologyCodesValidator
             logger.info("");
             System.exit(99);
         }
+    }
+
+    private static void validateCode(UcumService ucumSvc, String candidateCode) throws UcumException {
+        if (candidateCode == null || candidateCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("the argument is missing");
+        }
+        logger.info("Analyse du code UCUM : \"" + candidateCode + "\" ...");
+        String analysisResult = ucumSvc.analyse(candidateCode);
+        logger.info("Le code UCUM est VALIDE.");
+        logger.info("Résultat d'analyse (brut) : " + analysisResult);
+    }
+
+    private static void convertValue(UcumService ucumSvc, String value, String sourceUnit, String destinationUnit) throws UcumException {
+        if (value == null || value.trim().isEmpty() || sourceUnit == null || sourceUnit.trim().isEmpty()
+                || destinationUnit == null || destinationUnit.trim().isEmpty()) {
+            throw new IllegalArgumentException("conversion arguments are missing");
+        }
+        logger.info("Conversion demandée : " + value + " " + sourceUnit + " -> " + destinationUnit);
+        Decimal converted = ucumSvc.convert(new Decimal(value), sourceUnit, destinationUnit);
+        logger.info("Résultat de conversion : " + converted.asDecimal() + " " + destinationUnit);
     }
     
 }

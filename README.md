@@ -4,7 +4,7 @@ A Java application for validating UCUM (Unified Code for Units of Measure) codes
 
 ## Description
 
-This project provides a simple command-line tool to check if a given UCUM code (e.g., "mg", "kg/m2", "mm[Hg]") is valid according to the official UCUM standard. It loads UCUM definitions from an XML file (`ucum-essence.xml`) and uses the FHIR UCUM service to analyze and validate units.
+This project provides a command-line tool to validate UCUM codes (e.g., "mg", "kg/m2", "mm[Hg]") and to convert values between UCUM units (e.g., `1 kg -> [lb_av]`). It loads UCUM definitions from an XML file (`ucum-essence.xml`) and uses the FHIR UCUM service to analyze, validate, and convert units.
 
 UCUM is a system for representing units of measure in a standardized way, commonly used in healthcare and scientific applications.
 
@@ -66,16 +66,22 @@ The executable JAR includes all necessary dependencies and can be distributed as
 
 ### Using Maven
 
-Run the application with default arguments:
+Run the application with default arguments (from configuration.properties):
 
 ```bash
 mvn exec:java
 ```
 
-Run with custom arguments (path to XML and UCUM code):
+Run validation with custom arguments (path to XML and UCUM code):
 
 ```bash
-mvn exec:java -Dexec.args="path/to/ucum-essence.xml your_ucum_code"
+mvn exec:java "-Dexec.args=src/resources/ucum-essence.xml mg"
+```
+
+Run conversion with custom arguments (path, value, source unit, destination unit):
+
+```bash
+mvn exec:java "-Dexec.args=src/resources/ucum-essence.xml 1 kg [lb_av]"
 ```
 
 ## Configuration
@@ -87,21 +93,27 @@ The application supports configuration through a `configuration.properties` file
 Create a file named `configuration.properties` in the project root with the following properties:
 
 ```properties
-# Default path to UCUM essence XML file
-ucum.essence.path=C:/path/to/ucum-essence.xml
+# Default path to UCUM essence XML file (REQUIRED)
+ucum.essence.path=src/resources/ucum-essence.xml
 
-# Default UCUM code to validate when no arguments provided
+# Default UCUM code to validate when no arguments provided (REQUIRED for validation)
 ucum.default.code=ml
 
-# Log file configuration
-log.file.path=target/UcumTerminologyCodesValidator.txt
+# Feature selection (REQUIRED)
+codeValidation=true
+codeConversion=false
 
-# Application settings
+# Conversion inputs (REQUIRED when codeConversion=true)
+conversion.value=1
+conversion.source.unit=kg
+conversion.destination.unit=[lb_av]
+
+# Log file configuration (REQUIRED)
+log.file.path=target/UcumTerminologyCodesValidator.log.txt
+
+# Application settings (REQUIRED)
 app.name=UCUM Terminology Codes Validator
 app.version=1.0
-
-# Validation settings
-validation.timeout.seconds=30
 ```
 
 ### Configuration Override
@@ -116,39 +128,34 @@ mvn exec:java -Dconfig.file=/path/to/custom.properties
 
 The application uses the following priority order for configuration:
 
-1. **Command-line arguments** (highest priority)
+1. **Command-line arguments** (highest priority, when provided)
 2. **Configuration file properties**
-3. **Hardcoded defaults** (lowest priority)
+
+No hardcoded defaults are used.
 
 ### Examples
 
-- Valid code:
+- Validation with arguments:
   ```
-  mvn exec:java -Dexec.args="src/main/resources/ucum-essence.xml mg"
+  mvn exec:java "-Dexec.args=src/resources/ucum-essence.xml mg"
   ```
   Output: "Le code UCUM est VALIDE."
 
-- Invalid code:
+- Conversion with arguments:
   ```
-  mvn exec:java -Dexec.args="src/main/resources/ucum-essence.xml invalid_unit"
+  mvn exec:java "-Dexec.args=src/resources/ucum-essence.xml 1 kg [lb_av]"
   ```
-  Output: "Le code UCUM est INVALIDE ou INCONNU."
-
-- Invalid arguments (empty):
-  ```
-  mvn exec:java -Dexec.args="src/main/resources/ucum-essence.xml ''"
-  ```
-  Output: Logs "the argument is missing", "Execution ended with an exception." and exits.
+  Output: Logs "Résultat de conversion : 2.20462262184877580722974 [lb_av]".
 
 - Invalid path:
   ```
-  mvn exec:java -Dexec.args=":\\invalid\\path.xml ml"
+  mvn exec:java "-Dexec.args=:\\invalid\\path.xml mg"
   ```
   Output: Logs "Chemin d'accès invalide pour le fichier de définition UCUM : :\\invalid\\path.xml", "Execution ended with an exception." and exits.
 
 ## Logging and Output
 
-All execution results, including validation outcomes, errors, and execution status, are logged to a text file located at `target/UcumTerminologyCodesValidator.txt`. The logging uses Apache Log4j 2 with the following features:
+All execution results, including validation outcomes, conversion results, errors, and execution status, are logged to a text file located at `target/UcumTerminologyCodesValidator.log.txt`. The logging uses Apache Log4j 2 with the following features:
 
 - **Append Mode**: Each execution appends new log entries to the file without overwriting previous runs.
 - **Execution Separation**: Each new execution is separated by a dedicated separator line for clarity.
@@ -165,7 +172,7 @@ The log file captures:
 
 For executions ending with exceptions, the log includes an "Execution ended with an exception." message and a separator line.
 
-To view the results of all executions, check the `target/UcumTerminologyCodesValidator.txt` file after running the application.
+To view the results of all executions, check the `target/UcumTerminologyCodesValidator.log.txt` file after running the application.
 
 ## Running Tests
 
@@ -177,13 +184,13 @@ mvn test
 
 ## Project Structure
 
-- `src/main/java/com/abdelaliboussadi/terminology/UcumTerminologyCodesValidator.java`: Main application class.
+- `src/main/java/com/abdelaliboussadi/terminology/UcumTerminologyCodesValidator.java`: Main application class (validation + conversion).
 - `src/main/java/com/abdelaliboussadi/terminology/PropertiesUtil.java`: Utility class for reading configuration properties.
-- `src/main/resources/ucum-essence.xml`: UCUM unit definitions.
+- `src/resources/ucum-essence.xml`: UCUM unit definitions.
 - `src/main/resources/log4j2.xml`: Log4j 2 configuration for logging setup.
-- `configuration.properties`: Optional configuration file for customizing default values.
+- `configuration.properties`: Required configuration file (features + inputs).
 - `src/test/java/`: Unit tests.
-- `target/UcumTerminologyCodesValidator.txt`: Generated log file containing execution results (created after first run).
+- `target/UcumTerminologyCodesValidator.log.txt`: Generated log file containing execution results (created after first run).
 - `target/UcumTerminologyCodesValidator-1.0-executable.jar`: Standalone executable JAR with all dependencies (generated by `mvn package`).
 - `pom.xml`: Maven configuration.
 
